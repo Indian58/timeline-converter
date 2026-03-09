@@ -1,0 +1,51 @@
+[
+  {
+    "date": "2024-08-27",
+    "local_time": "19:26:00",
+    "local_timezone": "CDT",
+    "utc_time": "00:26:00",
+    "latitude": 38.6260541,
+    "longitude": -95.8180999,
+    "segment_type": "timeline_path"
+  },
+  {
+    "date": "2024-08-27",
+    "local_time": "19:45:00",
+    "local_timezone": "CDT",
+    "utc_time": "00:45:00",
+    "latitude": 38.627,
+    "longitude": -95.82,
+    "segment_type": "timeline_path"
+  },
+  {
+    "date": "2024-08-27",
+    "local_time": "21:00:00",
+    "local_timezone": "CDT",
+    "utc_time": "02:00:00",
+    "latitude": null,
+    "longitude": null,
+    "segment_type": "activity",
+    "activity_type": "IN_VEHICLE",
+    "activity_probability": 0.95
+  },
+  {
+    "date": "2024-08-27",
+    "local_time": "22:30:00",
+    "local_timezone": "CDT",
+    "utc_time": "03:30:00",
+    "latitude": 38.6260541,
+    "longitude": -90.1994042,
+    "segment_type": "visit",
+    "semantic_type": "HOME",
+    "visit_probability": 0.9
+  },
+  {
+    "date": "2024-11-05",
+    "local_time": "10:15:00",
+    "local_timezone": "CST",
+    "utc_time": "16:15:00",
+    "latitude": 38.6260541,
+    "longitude": -90.1994042,
+    "segment_type": "timeline_path"
+  }
+]
