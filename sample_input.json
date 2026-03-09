@@ -1,59 +1,51 @@
-{
-  "semanticSegments": [
-    {
-      "startTime": "2024-08-27T19:00:00.000-05:00",
-      "endTime": "2024-08-27T21:00:00.000-05:00",
-      "timelinePath": [
-        {
-          "point": "38.6260541°, -95.8180999°",
-          "time": "2024-08-27T19:26:00.000-05:00"
-        },
-        {
-          "point": "38.6270000°, -95.8200000°",
-          "time": "2024-08-27T19:45:00.000-05:00"
-        }
-      ]
-    },
-    {
-      "startTime": "2024-08-27T21:00:00.000-05:00",
-      "endTime": "2024-08-27T22:30:00.000-05:00",
-      "activity": {
-        "start": "2024-08-27T21:00:00.000-05:00",
-        "end": "2024-08-27T22:30:00.000-05:00",
-        "topCandidate": {
-          "type": "IN_VEHICLE",
-          "probability": 0.95
-        }
-      },
-      "startTimeTimezoneUtcOffsetMinutes": -300,
-      "endTimeTimezoneUtcOffsetMinutes": -300
-    },
-    {
-      "startTime": "2024-08-27T22:30:00.000-05:00",
-      "endTime": "2024-08-28T08:00:00.000-05:00",
-      "visit": {
-        "hierarchyLevel": 1,
-        "probability": 0.9,
-        "topCandidate": {
-          "semanticType": "HOME",
-          "probability": 0.95,
-          "placeLocation": {
-            "latLng": "38.6260541°, -90.1994042°"
-          }
-        }
-      },
-      "startTimeTimezoneUtcOffsetMinutes": -300,
-      "endTimeTimezoneUtcOffsetMinutes": -300
-    },
-    {
-      "startTime": "2024-11-05T10:00:00.000-06:00",
-      "endTime": "2024-11-05T11:00:00.000-06:00",
-      "timelinePath": [
-        {
-          "point": "38.6260541°, -90.1994042°",
-          "time": "2024-11-05T10:15:00.000-06:00"
-        }
-      ]
-    }
-  ]
-}
+[
+  {
+    "date": "2024-08-27",
+    "local_time": "19:26:00",
+    "local_timezone": "CDT",
+    "utc_time": "00:26:00",
+    "latitude": 38.6260541,
+    "longitude": -95.8180999,
+    "segment_type": "timeline_path"
+  },
+  {
+    "date": "2024-08-27",
+    "local_time": "19:45:00",
+    "local_timezone": "CDT",
+    "utc_time": "00:45:00",
+    "latitude": 38.627,
+    "longitude": -95.82,
+    "segment_type": "timeline_path"
+  },
+  {
+    "date": "2024-08-27",
+    "local_time": "21:00:00",
+    "local_timezone": "CDT",
+    "utc_time": "02:00:00",
+    "latitude": null,
+    "longitude": null,
+    "segment_type": "activity",
+    "activity_type": "IN_VEHICLE",
+    "activity_probability": 0.95
+  },
+  {
+    "date": "2024-08-27",
+    "local_time": "22:30:00",
+    "local_timezone": "CDT",
+    "utc_time": "03:30:00",
+    "latitude": 38.6260541,
+    "longitude": -90.1994042,
+    "segment_type": "visit",
+    "semantic_type": "HOME",
+    "visit_probability": 0.9
+  },
+  {
+    "date": "2024-11-05",
+    "local_time": "10:15:00",
+    "local_timezone": "CST",
+    "utc_time": "16:15:00",
+    "latitude": 38.6260541,
+    "longitude": -90.1994042,
+    "segment_type": "timeline_path"
+  }
+]
