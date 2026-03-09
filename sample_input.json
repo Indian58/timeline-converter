@@ -1,0 +1,59 @@
+{
+  "semanticSegments": [
+    {
+      "startTime": "2024-08-27T19:00:00.000-05:00",
+      "endTime": "2024-08-27T21:00:00.000-05:00",
+      "timelinePath": [
+        {
+          "point": "38.6260541°, -95.8180999°",
+          "time": "2024-08-27T19:26:00.000-05:00"
+        },
+        {
+          "point": "38.6270000°, -95.8200000°",
+          "time": "2024-08-27T19:45:00.000-05:00"
+        }
+      ]
+    },
+    {
+      "startTime": "2024-08-27T21:00:00.000-05:00",
+      "endTime": "2024-08-27T22:30:00.000-05:00",
+      "activity": {
+        "start": "2024-08-27T21:00:00.000-05:00",
+        "end": "2024-08-27T22:30:00.000-05:00",
+        "topCandidate": {
+          "type": "IN_VEHICLE",
+          "probability": 0.95
+        }
+      },
+      "startTimeTimezoneUtcOffsetMinutes": -300,
+      "endTimeTimezoneUtcOffsetMinutes": -300
+    },
+    {
+      "startTime": "2024-08-27T22:30:00.000-05:00",
+      "endTime": "2024-08-28T08:00:00.000-05:00",
+      "visit": {
+        "hierarchyLevel": 1,
+        "probability": 0.9,
+        "topCandidate": {
+          "semanticType": "HOME",
+          "probability": 0.95,
+          "placeLocation": {
+            "latLng": "38.6260541°, -90.1994042°"
+          }
+        }
+      },
+      "startTimeTimezoneUtcOffsetMinutes": -300,
+      "endTimeTimezoneUtcOffsetMinutes": -300
+    },
+    {
+      "startTime": "2024-11-05T10:00:00.000-06:00",
+      "endTime": "2024-11-05T11:00:00.000-06:00",
+      "timelinePath": [
+        {
+          "point": "38.6260541°, -90.1994042°",
+          "time": "2024-11-05T10:15:00.000-06:00"
+        }
+      ]
+    }
+  ]
+}
