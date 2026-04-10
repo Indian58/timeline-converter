@@ -528,49 +528,114 @@ def export_json(records: list[dict], path: str | Path) -> None:
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+def convert_directory(dir_path: str | Path) -> tuple[list[dict], list[str]]:
+    """Convert all JSON files in *dir_path* (searched recursively) to records.
+
+    Files are processed in sorted order so that output is deterministic.
+    Files that cannot be parsed are skipped with a warning printed to stderr.
+
+    Args:
+        dir_path: Path to a directory containing Google Timeline JSON files.
+
+    Returns:
+        A tuple of ``(records, skipped)`` where *records* is the combined list
+        of record dicts from all successfully converted files and *skipped* is
+        a list of file paths that could not be converted.
+    """
+    dir_path = Path(dir_path)
+    json_files = sorted(dir_path.rglob("*.json"))
+
+    if not json_files:
+        return [], []
+
+    all_records: list[dict] = []
+    skipped: list[str] = []
+
+    for json_file in json_files:
+        try:
+            with json_file.open(encoding="utf-8") as fh:
+                data = json.load(fh)
+        except json.JSONDecodeError as exc:
+            print(f"Warning: skipping {json_file} (invalid JSON: {exc})", file=sys.stderr)
+            skipped.append(str(json_file))
+            continue
+
+        try:
+            records = convert(data)
+        except ValueError as exc:
+            print(f"Warning: skipping {json_file} ({exc})", file=sys.stderr)
+            skipped.append(str(json_file))
+            continue
+
+        print(f"  {json_file}: {len(records)} records")
+        all_records.extend(records)
+
+    return all_records, skipped
+
+
 def main(argv: list[str] | None = None) -> int:
     """Command-line entry point.
 
     Usage::
 
         python timeline_converter.py <input.json> [output_stem]
+        python timeline_converter.py <directory/> [output_stem]
 
-    If *output_stem* is omitted, it defaults to the input filename without
-    its extension.  Two files are produced: ``<output_stem>.csv`` and
-    ``<output_stem>.json``.
+    When *input* is a directory every ``*.json`` file found inside it
+    (recursively) is converted and all records are combined into a single
+    pair of output files.
+
+    If *output_stem* is omitted it defaults to the input file stem (for a
+    single file) or the directory name (for a directory).  Two files are
+    produced: ``<output_stem>.csv`` and ``<output_stem>.json``.
     """
     import argparse
 
     parser = argparse.ArgumentParser(
         description="Convert Google Timeline semantic segments to CSV and JSON."
     )
-    parser.add_argument("input", help="Path to the input JSON file")
+    parser.add_argument(
+        "input",
+        help="Path to an input JSON file, or a directory of JSON files.",
+    )
     parser.add_argument(
         "output_stem",
         nargs="?",
-        help="Output filename stem (without extension). Defaults to the input file stem.",
+        help=(
+            "Output filename stem (without extension). "
+            "Defaults to the input file stem or directory name."
+        ),
     )
     args = parser.parse_args(argv)
 
     input_path = Path(args.input)
     if not input_path.exists():
-        print(f"Error: input file not found: {input_path}", file=sys.stderr)
+        print(f"Error: input path not found: {input_path}", file=sys.stderr)
         return 1
 
-    try:
-        with input_path.open(encoding="utf-8") as fh:
-            data = json.load(fh)
-    except json.JSONDecodeError as exc:
-        print(f"Error: failed to parse JSON: {exc}", file=sys.stderr)
-        return 1
+    if input_path.is_dir():
+        print(f"Processing directory: {input_path}")
+        records, skipped = convert_directory(input_path)
+        if not records and not skipped:
+            print(f"Error: no JSON files found in {input_path}", file=sys.stderr)
+            return 1
+        stem = args.output_stem if args.output_stem else input_path.name
+    else:
+        try:
+            with input_path.open(encoding="utf-8") as fh:
+                data = json.load(fh)
+        except json.JSONDecodeError as exc:
+            print(f"Error: failed to parse JSON: {exc}", file=sys.stderr)
+            return 1
 
-    try:
-        records = convert(data)
-    except ValueError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
+        try:
+            records = convert(data)
+        except ValueError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
 
-    stem = args.output_stem if args.output_stem else input_path.stem
+        stem = args.output_stem if args.output_stem else input_path.stem
+
     csv_path = Path(stem).with_suffix(".csv")
     json_path = Path(stem).with_suffix(".json")
 

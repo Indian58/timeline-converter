@@ -22,6 +22,7 @@ from timeline_converter import (
     process_place_visit,
     convert_timeline_objects,
     convert,
+    convert_directory,
     export_csv,
     export_json,
     main,
