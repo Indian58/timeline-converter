@@ -67,7 +67,7 @@ try:
                                 ts_raw = dur.get('startTimestamp', '')
                                 ts = ts_raw.replace('Z', '').replace('T', ', ')
                                 local = utc_str_to_local(ts_raw)
-                                out.write(f"{ts} UTC, {local}, lat {lat}, lon {lon}\n")
+                                out.write(f"{ts} UTC, {local}, {lat}, {lon}\n")
                                 count += 1
 
                             if 'placeVisit' in obj:
@@ -79,7 +79,7 @@ try:
                                 ts_raw = dur.get('startTimestamp', '')
                                 ts = ts_raw.replace('Z', '').replace('T', ', ')
                                 local = utc_str_to_local(ts_raw)
-                                out.write(f"{ts} UTC, {local}, lat {lat}, lon {lon}\n")
+                                out.write(f"{ts} UTC, {local}, {lat}, {lon}\n")
                                 count += 1
 
                         print(f"    → Extracted {count} records to output_{base_name}.txt")
