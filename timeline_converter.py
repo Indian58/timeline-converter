@@ -401,7 +401,7 @@ def convert_timeline_objects(data: dict) -> list[dict]:
                 records.extend(process_activity_segment(obj))
             elif "placeVisit" in obj:
                 records.extend(process_place_visit(obj))
-        except Exception as exc:  # pragma: no cover – belt-and-suspenders
+        except (KeyError, TypeError, ValueError) as exc:  # pragma: no cover – belt-and-suspenders
             print(f"Warning: skipping malformed timeline object: {exc}", file=sys.stderr)
 
     return records
@@ -435,7 +435,7 @@ def convert(data: dict) -> list[dict]:
         for segment in data["semanticSegments"]:
             try:
                 records.extend(process_segment(segment))
-            except Exception as exc:  # pragma: no cover – belt-and-suspenders
+            except (KeyError, TypeError, ValueError) as exc:  # pragma: no cover – belt-and-suspenders
                 print(f"Warning: skipping malformed segment: {exc}", file=sys.stderr)
         return records
 
