@@ -1,11 +1,17 @@
 """
 Timeline Converter
 
-Converts Google Timeline semantic segment data to a structured format with:
+Converts Google Timeline data to a structured format with:
 - Date (YYYY-MM-DD)
-- Latitude & Longitude (parsed from "lat°, lon°" format)
-- UTC Time (converted from ISO 8601 timestamps with timezone offset)
+- Latitude & Longitude
+- UTC Time (converted from ISO 8601 timestamps)
 - Local Time (CST/CDT with proper DST handling)
+
+Supports two input formats:
+- Current format: 'semanticSegments' (newer Google Timeline export)
+- Legacy format:  'timelineObjects' with 'activitySegment'/'placeVisit'
+                  (older Google Maps Timeline export with E7 coordinates
+                  and UTC timestamps)
 
 Exports to both CSV and JSON formats.
 """
@@ -283,35 +289,163 @@ def process_segment(segment: dict) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Legacy timelineObjects format handlers
+# ---------------------------------------------------------------------------
+
+def _parse_e7_coords(obj: dict, lat_key: str = "latitudeE7", lon_key: str = "longitudeE7") -> tuple[float, float]:
+    """Parse E7-encoded integer coordinates into (lat, lon) floats.
+
+    Google's older Timeline export stores coordinates as integers scaled by
+    10^7 (e.g. 386260541 → 38.6260541°).
+
+    Args:
+        obj:     Dict containing the E7 coordinate keys.
+        lat_key: Key for the latitude E7 value.
+        lon_key: Key for the longitude E7 value.
+
+    Returns:
+        A (latitude, longitude) tuple of floats, or (nan, nan) if absent.
+    """
+    lat_e7 = obj.get(lat_key)
+    lon_e7 = obj.get(lon_key)
+    if lat_e7 is None or lon_e7 is None:
+        return float("nan"), float("nan")
+    return lat_e7 / 10_000_000, lon_e7 / 10_000_000
+
+
+def process_activity_segment(obj: dict) -> list[dict]:
+    """Extract a record from a legacy *activitySegment* timeline object.
+
+    Args:
+        obj: A dict with an 'activitySegment' key from a ``timelineObjects``
+             payload.
+
+    Returns:
+        A list containing one record dict, or an empty list if the segment
+        cannot be parsed.
+    """
+    seg = obj.get("activitySegment", {})
+    dur = seg.get("duration", {})
+    raw_time = dur.get("startTimestamp", "")
+    try:
+        dt = parse_iso8601(raw_time)
+    except ValueError:
+        return []
+
+    dt_local = to_central(dt)
+    lat, lon = _parse_e7_coords(seg.get("startLocation", {}))
+
+    extra = {
+        "activity_type": seg.get("activityType", ""),
+    }
+    return [_make_record(dt_local, lat, lon, "activity_segment", extra)]
+
+
+def process_place_visit(obj: dict) -> list[dict]:
+    """Extract a record from a legacy *placeVisit* timeline object.
+
+    Args:
+        obj: A dict with a 'placeVisit' key from a ``timelineObjects``
+             payload.
+
+    Returns:
+        A list containing one record dict, or an empty list if the visit
+        cannot be parsed.
+    """
+    visit = obj.get("placeVisit", {})
+    dur = visit.get("duration", {})
+    raw_time = dur.get("startTimestamp", "")
+    try:
+        dt = parse_iso8601(raw_time)
+    except ValueError:
+        return []
+
+    dt_local = to_central(dt)
+    lat, lon = _parse_e7_coords(visit.get("location", {}))
+
+    extra = {
+        "place_name": visit.get("location", {}).get("name", ""),
+        "place_address": visit.get("location", {}).get("address", ""),
+    }
+    return [_make_record(dt_local, lat, lon, "place_visit", extra)]
+
+
+def convert_timeline_objects(data: dict) -> list[dict]:
+    """Convert a legacy ``timelineObjects`` payload to a list of record dicts.
+
+    This format is produced by older Google Maps Timeline exports and contains
+    a list of objects each with either an 'activitySegment' or 'placeVisit'
+    key.  Timestamps are in UTC (Z suffix) and coordinates are E7-encoded
+    integers.  All times are converted to America/Chicago (CST/CDT) with
+    correct Daylight Saving Time handling.
+
+    Args:
+        data: Parsed JSON dict with a 'timelineObjects' key.
+
+    Returns:
+        A list of record dicts with ``local_time`` and ``local_timezone``
+        columns reflecting the DST-aware Central time.
+
+    Raises:
+        ValueError: If *data* does not contain a 'timelineObjects' key.
+    """
+    if "timelineObjects" not in data:
+        raise ValueError(
+            "Input JSON must contain a 'timelineObjects' key at the top level."
+        )
+
+    records = []
+    for obj in data["timelineObjects"]:
+        try:
+            if "activitySegment" in obj:
+                records.extend(process_activity_segment(obj))
+            elif "placeVisit" in obj:
+                records.extend(process_place_visit(obj))
+        except Exception as exc:  # pragma: no cover – belt-and-suspenders
+            print(f"Warning: skipping malformed timeline object: {exc}", file=sys.stderr)
+
+    return records
+
+
+# ---------------------------------------------------------------------------
 # Top-level conversion
 # ---------------------------------------------------------------------------
 
 def convert(data: dict) -> list[dict]:
-    """Convert a full semantic-segment payload to a list of record dicts.
+    """Convert a Google Timeline JSON payload to a list of record dicts.
+
+    Supports both the current ``semanticSegments`` format and the legacy
+    ``timelineObjects`` format.  The format is detected automatically.
 
     Args:
-        data: Parsed JSON dict with a 'semanticSegments' key.
+        data: Parsed JSON dict with either a 'semanticSegments' key (current
+              format) or a 'timelineObjects' key (legacy format).
 
     Returns:
         A list of record dicts, one per timeline point / activity / visit.
+        Each record contains ``local_time`` and ``local_timezone`` columns
+        reflecting America/Chicago (CST/CDT) with correct DST handling.
 
     Raises:
-        ValueError: If *data* does not contain a 'semanticSegments' key.
+        ValueError: If *data* contains neither 'semanticSegments' nor
+                    'timelineObjects'.
     """
-    if "semanticSegments" not in data:
-        raise ValueError(
-            "Input JSON must contain a 'semanticSegments' key at the top level."
-        )
+    if "semanticSegments" in data:
+        records = []
+        for segment in data["semanticSegments"]:
+            try:
+                records.extend(process_segment(segment))
+            except Exception as exc:  # pragma: no cover – belt-and-suspenders
+                print(f"Warning: skipping malformed segment: {exc}", file=sys.stderr)
+        return records
 
-    records = []
-    for segment in data["semanticSegments"]:
-        try:
-            records.extend(process_segment(segment))
-        except Exception as exc:  # pragma: no cover – belt-and-suspenders
-            # Log but don't abort on a single bad segment
-            print(f"Warning: skipping malformed segment: {exc}", file=sys.stderr)
+    if "timelineObjects" in data:
+        return convert_timeline_objects(data)
 
-    return records
+    raise ValueError(
+        "Input JSON must contain a 'semanticSegments' key (current format) "
+        "or a 'timelineObjects' key (legacy format) at the top level."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +464,8 @@ _CSV_FIELDNAMES = [
     "activity_probability",
     "semantic_type",
     "visit_probability",
+    "place_name",
+    "place_address",
 ]
 
 

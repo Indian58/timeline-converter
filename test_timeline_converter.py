@@ -18,6 +18,9 @@ from timeline_converter import (
     to_central,
     get_timezone_abbreviation,
     process_segment,
+    process_activity_segment,
+    process_place_visit,
+    convert_timeline_objects,
     convert,
     export_csv,
     export_json,
@@ -332,7 +335,237 @@ class TestProcessVisit:
 
 
 # ---------------------------------------------------------------------------
-# convert (top-level)
+# process_activity_segment (legacy timelineObjects format)
+# ---------------------------------------------------------------------------
+
+class TestProcessActivitySegment:
+    def test_basic_activity_segment_summer(self):
+        """Summer UTC timestamp should convert to CDT (UTC-5)."""
+        obj = {
+            "activitySegment": {
+                "duration": {
+                    "startTimestamp": "2024-08-27T19:26:00.000Z",
+                },
+                "startLocation": {
+                    "latitudeE7": 386260541,
+                    "longitudeE7": -958180999,
+                },
+                "activityType": "IN_VEHICLE",
+            }
+        }
+        records = process_activity_segment(obj)
+        assert len(records) == 1
+        r = records[0]
+        assert r["segment_type"] == "activity_segment"
+        assert r["activity_type"] == "IN_VEHICLE"
+        assert r["latitude"] == pytest.approx(38.6260541)
+        assert r["longitude"] == pytest.approx(-95.8180999)
+        # 19:26 UTC → 14:26 CDT (UTC-5)
+        assert r["utc_time"] == "19:26:00"
+        assert r["local_time"] == "14:26:00"
+        assert r["local_timezone"] == "CDT"
+        assert r["date"] == "2024-08-27"
+
+    def test_activity_segment_winter(self):
+        """Winter UTC timestamp should convert to CST (UTC-6)."""
+        obj = {
+            "activitySegment": {
+                "duration": {
+                    "startTimestamp": "2024-01-15T18:00:00.000Z",
+                },
+                "startLocation": {
+                    "latitudeE7": 386260541,
+                    "longitudeE7": -901994042,
+                },
+                "activityType": "WALKING",
+            }
+        }
+        records = process_activity_segment(obj)
+        assert len(records) == 1
+        r = records[0]
+        # 18:00 UTC → 12:00 CST (UTC-6)
+        assert r["local_time"] == "12:00:00"
+        assert r["local_timezone"] == "CST"
+
+    def test_activity_segment_missing_timestamp(self):
+        obj = {
+            "activitySegment": {
+                "duration": {},
+                "startLocation": {"latitudeE7": 386260541, "longitudeE7": -958180999},
+            }
+        }
+        records = process_activity_segment(obj)
+        assert len(records) == 0
+
+    def test_activity_segment_missing_location(self):
+        """Missing location fields should produce NaN coordinates."""
+        obj = {
+            "activitySegment": {
+                "duration": {"startTimestamp": "2024-08-27T19:00:00.000Z"},
+            }
+        }
+        records = process_activity_segment(obj)
+        assert len(records) == 1
+        assert math.isnan(records[0]["latitude"])
+        assert math.isnan(records[0]["longitude"])
+
+    def test_activity_segment_invalid_timestamp(self):
+        obj = {
+            "activitySegment": {
+                "duration": {"startTimestamp": "not-a-time"},
+                "startLocation": {"latitudeE7": 386260541, "longitudeE7": -958180999},
+            }
+        }
+        records = process_activity_segment(obj)
+        assert len(records) == 0
+
+
+# ---------------------------------------------------------------------------
+# process_place_visit (legacy timelineObjects format)
+# ---------------------------------------------------------------------------
+
+class TestProcessPlaceVisit:
+    def test_basic_place_visit_summer(self):
+        """Summer UTC timestamp should convert to CDT with correct coords."""
+        obj = {
+            "placeVisit": {
+                "duration": {
+                    "startTimestamp": "2024-08-27T22:30:00.000Z",
+                },
+                "location": {
+                    "latitudeE7": 386260541,
+                    "longitudeE7": -901994042,
+                    "name": "Home",
+                    "address": "123 Main St",
+                },
+            }
+        }
+        records = process_place_visit(obj)
+        assert len(records) == 1
+        r = records[0]
+        assert r["segment_type"] == "place_visit"
+        assert r["latitude"] == pytest.approx(38.6260541)
+        assert r["longitude"] == pytest.approx(-90.1994042)
+        assert r["place_name"] == "Home"
+        assert r["place_address"] == "123 Main St"
+        # 22:30 UTC → 17:30 CDT (UTC-5)
+        assert r["utc_time"] == "22:30:00"
+        assert r["local_time"] == "17:30:00"
+        assert r["local_timezone"] == "CDT"
+
+    def test_place_visit_winter(self):
+        """Winter UTC timestamp should convert to CST (UTC-6)."""
+        obj = {
+            "placeVisit": {
+                "duration": {"startTimestamp": "2024-01-15T16:00:00.000Z"},
+                "location": {"latitudeE7": 386260541, "longitudeE7": -901994042},
+            }
+        }
+        records = process_place_visit(obj)
+        assert len(records) == 1
+        # 16:00 UTC → 10:00 CST (UTC-6)
+        assert records[0]["local_time"] == "10:00:00"
+        assert records[0]["local_timezone"] == "CST"
+
+    def test_place_visit_missing_timestamp(self):
+        obj = {"placeVisit": {"duration": {}, "location": {}}}
+        records = process_place_visit(obj)
+        assert len(records) == 0
+
+    def test_place_visit_missing_location(self):
+        """Missing location coords should produce NaN."""
+        obj = {
+            "placeVisit": {
+                "duration": {"startTimestamp": "2024-08-27T22:30:00.000Z"},
+                "location": {},
+            }
+        }
+        records = process_place_visit(obj)
+        assert len(records) == 1
+        assert math.isnan(records[0]["latitude"])
+        assert math.isnan(records[0]["longitude"])
+
+
+# ---------------------------------------------------------------------------
+# convert_timeline_objects
+# ---------------------------------------------------------------------------
+
+class TestConvertTimelineObjects:
+    def test_convert_mixed_objects(self):
+        data = {
+            "timelineObjects": [
+                {
+                    "activitySegment": {
+                        "duration": {"startTimestamp": "2024-08-27T19:00:00.000Z"},
+                        "startLocation": {"latitudeE7": 386260541, "longitudeE7": -958180999},
+                        "activityType": "IN_VEHICLE",
+                    }
+                },
+                {
+                    "placeVisit": {
+                        "duration": {"startTimestamp": "2024-08-27T22:30:00.000Z"},
+                        "location": {"latitudeE7": 386260541, "longitudeE7": -901994042, "name": "Home"},
+                    }
+                },
+            ]
+        }
+        records = convert_timeline_objects(data)
+        assert len(records) == 2
+        types = {r["segment_type"] for r in records}
+        assert "activity_segment" in types
+        assert "place_visit" in types
+
+    def test_local_time_dst_adjusted(self):
+        """Records converted from UTC Z timestamps should have correct local time."""
+        data = {
+            "timelineObjects": [
+                {
+                    "activitySegment": {
+                        "duration": {"startTimestamp": "2024-08-27T20:00:00.000Z"},
+                        "startLocation": {"latitudeE7": 386260541, "longitudeE7": -958180999},
+                    }
+                }
+            ]
+        }
+        records = convert_timeline_objects(data)
+        assert len(records) == 1
+        r = records[0]
+        # 20:00 UTC → 15:00 CDT (UTC-5, summer DST)
+        assert r["utc_time"] == "20:00:00"
+        assert r["local_time"] == "15:00:00"
+        assert r["local_timezone"] == "CDT"
+
+    def test_local_time_cst_adjusted(self):
+        """Winter timestamps should produce CST (UTC-6) local time."""
+        data = {
+            "timelineObjects": [
+                {
+                    "placeVisit": {
+                        "duration": {"startTimestamp": "2024-12-25T18:00:00.000Z"},
+                        "location": {"latitudeE7": 386260541, "longitudeE7": -901994042},
+                    }
+                }
+            ]
+        }
+        records = convert_timeline_objects(data)
+        assert len(records) == 1
+        r = records[0]
+        # 18:00 UTC → 12:00 CST (UTC-6, winter)
+        assert r["utc_time"] == "18:00:00"
+        assert r["local_time"] == "12:00:00"
+        assert r["local_timezone"] == "CST"
+
+    def test_missing_key_raises(self):
+        with pytest.raises(ValueError, match="timelineObjects"):
+            convert_timeline_objects({"foo": []})
+
+    def test_empty_timeline(self):
+        records = convert_timeline_objects({"timelineObjects": []})
+        assert records == []
+
+
+# ---------------------------------------------------------------------------
+# convert – auto-detects format
 # ---------------------------------------------------------------------------
 
 class TestConvert:
@@ -356,8 +589,25 @@ class TestConvert:
         assert records[0]["date"] == "2024-08-27"
 
     def test_convert_missing_key_raises(self):
-        with pytest.raises(ValueError, match="semanticSegments"):
+        with pytest.raises(ValueError, match="semanticSegments.*timelineObjects|timelineObjects.*semanticSegments"):
             convert({"foo": []})
+
+    def test_convert_detects_timeline_objects_format(self):
+        data = {
+            "timelineObjects": [
+                {
+                    "activitySegment": {
+                        "duration": {"startTimestamp": "2024-08-27T19:00:00.000Z"},
+                        "startLocation": {"latitudeE7": 386260541, "longitudeE7": -958180999},
+                        "activityType": "WALKING",
+                    }
+                }
+            ]
+        }
+        records = convert(data)
+        assert len(records) == 1
+        assert records[0]["segment_type"] == "activity_segment"
+        assert records[0]["local_timezone"] in ("CST", "CDT")
 
     def test_convert_empty_segments(self):
         records = convert({"semanticSegments": []})
